@@ -1,0 +1,61 @@
+trigger: none
+pr: none
+
+workItemUpdated:
+  types:
+    - Updated
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: none
+
+  - task: PowerShell@2
+    displayName: 'Check if column changed to Testing'
+    inputs:
+      targetType: 'inline'
+      script: |
+        $workItemId = "$(System.WorkItemId)"
+        $org = "$(System.CollectionUri)"
+        $project = "$(System.TeamProject)"
+        $token = "$(System.AccessToken)"
+        $headers = @{Authorization = "Bearer $token"}
+        $url = "$org$project/_apis/wit/workitems/$workItemId?api-version=7.0"
+        $response = Invoke-RestMethod -Uri $url -Headers $headers
+        $fields = $response.fields
+        $boardColumn = $fields.'System.BoardColumn'
+        $branchName = $fields.'Custom.BranchName'  # Update with your actual field name
+        if ($boardColumn -eq 'Testing') {
+          Write-Host "##vso[task.setvariable variable=runTests]true"
+          Write-Host "##vso[task.setvariable variable=workItemId]$workItemId"
+          Write-Host "##vso[task.setvariable variable=branchName]$branchName"
+        } else {
+          Write-Host "##vso[task.setvariable variable=runTests]false"
+        }
+
+  - task: PowerShell@2
+    displayName: 'Trigger GitHub Action via API'
+    condition: eq(variables['runTests'], 'true')
+    env:
+      GITHUB_TOKEN: $(github_pat)
+    inputs:
+      targetType: 'inline'
+      script: |
+        $repo = "Swapnill-Raut/TestCardMovementTrigger"
+        $workflow = "github-actions-demo.yml"
+        $workItemId = "$(workItemId)"
+        $branchName = "$(branchName)"
+        $ref = if ($branchName) { $branchName } else { "main" }
+        $body = @{
+          "ref" = $ref
+          "inputs" = @{
+            "work_item_id" = $workItemId
+          }
+        } | ConvertTo-Json
+        $headers = @{
+          "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          "Accept" = "application/vnd.github+json"
+        }
+        $url = "https://api.github.com/repos/$repo/actions/workflows/$workflow/dispatches"
+        Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
