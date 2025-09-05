@@ -1,0 +1,35 @@
+name: External Trigger
+ 
+on: 
+
+  repository_dispatch:
+
+    types: [my-custom-event]
+ 
+jobs:
+
+  build-and-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+
+        uses: actions/checkout@v4
+ 
+      - name: Print custom payload
+
+        run: |
+
+          echo "Event type: ${{ github.event.action }}"
+
+          echo "Payload: ${{ toJson(github.event.client_payload) }}"
+
+          echo "Value from payload: ${{ github.event.client_payload.message }}"
+ 
+      - name: Perform deployment
+
+        run: echo "Deployment logic here..."
+
+ 
