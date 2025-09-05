@@ -30,7 +30,7 @@ def get_work_item_details(work_item_id):
 
 def trigger_github_workflow(work_item_id, branch_name):
     repo = "Swapnill-Raut/TestCardMovementTrigger"
-    workflow = "github-actions-demo.yml"
+    workflow = "run-tests.yml"
     url = f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches"
     headers = {
         "Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}",
