@@ -1,9 +1,12 @@
 trigger: none
 pr: none
 
-workItemUpdated:
-  types:
-    - Updated
+schedules:
+  - cron: "*/10 * * * *"  # Runs every 10 minutes
+    displayName: "Poll for Testing cards"
+    branches:
+      include:
+        - main
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -12,50 +15,42 @@ steps:
   - checkout: none
 
   - task: PowerShell@2
-    displayName: 'Check if column changed to Testing'
+    displayName: 'Find work items in Testing column'
+    env:
+      GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
-        $workItemId = "$(System.WorkItemId)"
-        $org = "$(System.CollectionUri)"
-        $project = "$(System.TeamProject)"
+        # Example: Query Azure DevOps for work items in Testing column
+        # You need to implement logic to fetch work items and trigger GitHub Action
+        # This is a template, update with your organization/project details
+
+        $org = "<your-ado-org-url>"
+        $project = "<your-ado-project-name>"
         $token = "$(System.AccessToken)"
         $headers = @{Authorization = "Bearer $token"}
-        $url = "$org$project/_apis/wit/workitems/$workItemId?api-version=7.0"
-        $response = Invoke-RestMethod -Uri $url -Headers $headers
-        $fields = $response.fields
-        $boardColumn = $fields.'System.BoardColumn'
-        $branchName = $fields.'Custom.BranchName'  # Update with your actual field name
-        if ($boardColumn -eq 'Testing') {
-          Write-Host "##vso[task.setvariable variable=runTests]true"
-          Write-Host "##vso[task.setvariable variable=workItemId]$workItemId"
-          Write-Host "##vso[task.setvariable variable=branchName]$branchName"
-        } else {
-          Write-Host "##vso[task.setvariable variable=runTests]false"
-        }
-
-  - task: PowerShell@2
-    displayName: 'Trigger GitHub Action via API'
-    condition: eq(variables['runTests'], 'true')
-    env:
-      GITHUB_TOKEN: $(github_pat)
-    inputs:
-      targetType: 'inline'
-      script: |
-        $repo = "Swapnill-Raut/TestCardMovementTrigger"
-        $workflow = "github-actions-demo.yml"
-        $workItemId = "$(workItemId)"
-        $branchName = "$(branchName)"
-        $ref = if ($branchName) { $branchName } else { "main" }
-        $body = @{
-          "ref" = $ref
-          "inputs" = @{
-            "work_item_id" = $workItemId
-          }
+        $wiql = @{
+          "query" = "SELECT [System.Id], [System.BoardColumn], [Custom.BranchName] FROM WorkItems WHERE [System.BoardColumn] = 'Testing'"
         } | ConvertTo-Json
-        $headers = @{
-          "Authorization" = "Bearer $env:GITHUB_TOKEN"
-          "Accept" = "application/vnd.github+json"
+        $url = "$org$project/_apis/wit/wiql?api-version=7.0"
+        $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $wiql
+        foreach ($item in $response.workItems) {
+          $workItemId = $item.id
+          # Fetch full work item details if needed
+          $wi_url = "$org$project/_apis/wit/workitems/$workItemId?api-version=7.0"
+          $wi_response = Invoke-RestMethod -Uri $wi_url -Headers $headers
+          $branchName = $wi_response.fields.'Custom.BranchName'
+          $ref = if ($branchName) { $branchName } else { "main" }
+          $body = @{
+            "ref" = $ref
+            "inputs" = @{
+              "work_item_id" = $workItemId
+            }
+          } | ConvertTo-Json
+          $gh_headers = @{
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+            "Accept" = "application/vnd.github+json"
+          }
+          $gh_url = "https://api.github.com/repos/Swapnill-Raut/TestCardMovementTrigger/actions/workflows/github-actions-demo.yml/dispatches"
+          Invoke-RestMethod -Uri $gh_url -Method Post -Headers $gh_headers -Body $body
         }
-        $url = "https://api.github.com/repos/$repo/actions/workflows/$workflow/dispatches"
-        Invoke-RestMethod -Uri $url -Method Post -Headers $headers -Body $body
