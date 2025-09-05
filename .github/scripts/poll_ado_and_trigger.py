@@ -10,12 +10,20 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Set as a secret if you want to trigg
 # Find work items moved to "Testing" in the last polling interval
 def get_testing_cards():
     # Adjust time window as needed (e.g., last 15 minutes)
-    time_window = (datetime.utcnow() - timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    wiql = {
-        "query": f"SELECT [System.Id], [System.BoardColumn], [Custom.BranchName] FROM WorkItems WHERE [System.BoardColumn] = 'Testing' AND [System.ChangedDate] >= '{time_window}'"
+    # time_window = (datetime.utcnow() - timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # wiql = {
+    #     "query": f"SELECT [System.Id], [System.BoardColumn], [Custom.BranchName] FROM WorkItems WHERE [System.BoardColumn] = 'Testing' AND [System.ChangedDate] >= '{time_window}'"
+    # }
+    # url = f"{ADO_ORG_URL}{ADO_PROJECT}/_apis/wit/wiql?api-version=7.0"
+    # response = requests.post(url, json=wiql, auth=("", ADO_PAT))
+    # response.raise_for_status()
+    # work_items = response.json().get("workItems", [])
+    # return [item["id"] for item in work_items]
+     wiql = {
+        "query": "SELECT [System.Id] FROM WorkItems WHERE [System.BoardColumn] = 'Testing'"
     }
-    url = f"{ADO_ORG_URL}{ADO_PROJECT}/_apis/wit/wiql?api-version=7.0"
-    response = requests.post(url, json=wiql, auth=("", ADO_PAT))
+    url = f"{os.getenv('ADO_ORG_URL')}{os.getenv('ADO_PROJECT')}/_apis/wit/wiql?api-version=7.0"
+    response = requests.post(url, json=wiql, auth=("", os.getenv('ADO_PAT')))
     response.raise_for_status()
     work_items = response.json().get("workItems", [])
     return [item["id"] for item in work_items]
