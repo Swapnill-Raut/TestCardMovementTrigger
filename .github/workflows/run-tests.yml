@@ -24,7 +24,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests for ADO card
+        env:
+          WORK_ITEM_ID: ${{ github.event.inputs.work_item_id }}
         run: |
-          echo "Running tests for work item ${{ github.event.inputs.work_item_id }}"
-          # Example: Pass work_item_id to pytest if needed
-          pytest -v --work-item-id "${{
+          echo "Running tests for work item $WORK_ITEM_ID"
+          pytest -v --work-item-id "$WORK_ITEM_ID"
