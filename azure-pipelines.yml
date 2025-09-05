@@ -1,0 +1,56 @@
+trigger: none
+pr: none
+
+schedules:
+  - cron: "*/10 * * * *"  # Runs every 10 minutes
+    displayName: "Poll for Testing cards"
+    branches:
+      include:
+        - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - checkout: none
+
+  - task: PowerShell@2
+    displayName: 'Find work items in Testing column'
+    env:
+      GITHUB_TOKEN: $(GITHUB_TOKEN)
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Example: Query Azure DevOps for work items in Testing column
+        # You need to implement logic to fetch work items and trigger GitHub Action
+        # This is a template, update with your organization/project details
+
+        $org = "<your-ado-org-url>"
+        $project = "<your-ado-project-name>"
+        $token = "$(System.AccessToken)"
+        $headers = @{Authorization = "Bearer $token"}
+        $wiql = @{
+          "query" = "SELECT [System.Id], [System.BoardColumn], [Custom.BranchName] FROM WorkItems WHERE [System.BoardColumn] = 'Testing'"
+        } | ConvertTo-Json
+        $url = "$org$project/_apis/wit/wiql?api-version=7.0"
+        $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $wiql
+        foreach ($item in $response.workItems) {
+          $workItemId = $item.id
+          # Fetch full work item details if needed
+          $wi_url = "$org$project/_apis/wit/workitems/$workItemId?api-version=7.0"
+          $wi_response = Invoke-RestMethod -Uri $wi_url -Headers $headers
+          $branchName = $wi_response.fields.'Custom.BranchName'
+          $ref = if ($branchName) { $branchName } else { "main" }
+          $body = @{
+            "ref" = $ref
+            "inputs" = @{
+              "work_item_id" = $workItemId
+            }
+          } | ConvertTo-Json
+          $gh_headers = @{
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+            "Accept" = "application/vnd.github+json"
+          }
+          $gh_url = "https://api.github.com/repos/Swapnill-Raut/TestCardMovementTrigger/actions/workflows/github-actions-demo.yml/dispatches"
+          Invoke-RestMethod -Uri $gh_url -Method Post -Headers $gh_headers -Body $body
+        }
