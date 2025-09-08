@@ -1,65 +1,44 @@
-name: 'Run Tests from Azure DevOps Card Movement'
+name: 'Run Tests from Azure DevOps Card'
 
 on:
   workflow_dispatch:
     inputs:
-      markers:
-        description: 'Pytest markers to run (e.g., smoke, regression, regression_FIFA)'
-        required: true
-        type: string
-        default: 'smoke'
-      customer:
-        description: 'Customer configuration (demo, fifa, nba, qc7, vanilla, ioc)'
-        required: false
-        type: string
-        default: 'demo'
-      browsers:
-        description: 'Browsers to test (chrome, edge, firefox, webkit)'
-        required: false
-        type: string
-        default: 'chrome'
       work_item_id:
-        description: 'Azure DevOps work item ID that triggered this test'
-        required: false
+        description: 'Azure DevOps work item ID'
+        required: true
         type: string
       work_item_title:
         description: 'Azure DevOps work item title'
         required: false
         type: string
-      system_url:
-        description: 'Override system URL for testing (optional)'
-        required: false
+      branch_name:
+        description: 'Branch associated with the work item'
+        required: true
         type: string
 
-env:
-  PYTHONPATH: ${{ github.workspace }}/TestScriptGeneratorBOT
-
 jobs:
-  run-automated-tests:
+  trigger-branch-tests:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: ${{ fromJson(format('["{0}"]', github.event.inputs.browsers || 'chrome')) }}
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.inputs.branch_name }}
+
+      - name: Display trigger information
+        run: |
+          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
+          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
+          echo "Branch: ${{ github.event.inputs.branch_name }}"
+          echo "Triggered by: Azure DevOps card movement to Testing"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-
-      - name: Install Python dependencies
+      - name: Install dependencies
         working-directory: TestScriptGeneratorBOT
         run: |
           pip install --upgrade pip
@@ -68,103 +47,28 @@ jobs:
       - name: Install Playwright browsers
         working-directory: TestScriptGeneratorBOT
         run: |
-          playwright install ${{ matrix.browser }}
-          playwright install-deps ${{ matrix.browser }}
+          playwright install chromium
 
-      - name: Display test execution information
-        run: |
-          echo "🎯 Test Execution Details:"
-          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
-          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
-          echo "Test Markers: ${{ github.event.inputs.markers }}"
-          echo "Customer Config: ${{ github.event.inputs.customer }}"
-          echo "Browser: ${{ matrix.browser }}"
-          echo "System URL Override: ${{ github.event.inputs.system_url }}"
-          echo "Branch: ${{ github.ref_name }}"
-
-      - name: Create required directories
-        working-directory: TestScriptGeneratorBOT
-        run: |
-          mkdir -p screenshots
-          mkdir -p reports
-          mkdir -p recordings
-          mkdir -p download
-
-      - name: Run automated tests
+      - name: Run tests from branch
         working-directory: TestScriptGeneratorBOT
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          AZURE_CONCATENATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_CONCATENATION_STORAGE_CONNECTION_STRING }}
-          AZURE_CONCATENATION_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_CONCATENATION_STORAGE_CONTAINER_NAME }}
-          AZURE_AUTOMATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_AUTOMATION_STORAGE_CONNECTION_STRING }}
-          AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME }}
-          AZURE_TEST_SUITE_ID: ${{ secrets.AZURE_TEST_SUITE_ID }}
-          AZURE_TEST_PLAN_ID: ${{ secrets.AZURE_TEST_PLAN_ID }}
-          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
-          SYSTEM_URL_OVERRIDE: ${{ github.event.inputs.system_url }}
         run: |
-          # Run tests based on markers provided by MCP monitor
-          echo "🚀 Starting test execution..."
+          echo "Running tests from branch: ${{ github.event.inputs.branch_name }}"
+          echo "Triggered by Work Item: ${{ github.event.inputs.work_item_id }}"
           
-          # Build pytest command with parameters
-          PYTEST_CMD="pytest -v --customer ${{ github.event.inputs.customer }} -m \"${{ github.event.inputs.markers }}\" --browser ${{ matrix.browser }}"
+          # Run basic smoke tests from the branch
+          pytest -v --customer demo -m smoke --browser chrome
           
-          # Add HTML report generation
-          PYTEST_CMD="$PYTEST_CMD --html=reports/report_${{ matrix.browser }}_workitem_${{ github.event.inputs.work_item_id }}.html --self-contained-html"
-          
-          # Add JUnit XML for Azure DevOps integration
-          PYTEST_CMD="$PYTEST_CMD --junitxml=reports/junit_${{ matrix.browser }}_workitem_${{ github.event.inputs.work_item_id }}.xml"
-          
-          # Execute the tests
-          echo "Executing: $PYTEST_CMD"
-          eval $PYTEST_CMD
-          
-          echo "✅ Test execution completed"
+          echo "Test execution completed for Work Item ${{ github.event.inputs.work_item_id }}"
 
-      - name: Upload test reports
+      - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-reports-${{ matrix.browser }}-workitem-${{ github.event.inputs.work_item_id }}
+          name: test-results-workitem-${{ github.event.inputs.work_item_id }}
           path: |
             TestScriptGeneratorBOT/reports/
             TestScriptGeneratorBOT/screenshots/
-            TestScriptGeneratorBOT/recordings/
-          retention-days: 30
-
-      - name: Upload failure artifacts
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: failure-artifacts-${{ matrix.browser }}-workitem-${{ github.event.inputs.work_item_id }}
-          path: |
-            TestScriptGeneratorBOT/screenshots/
-            TestScriptGeneratorBOT/recordings/
-            TestScriptGeneratorBOT/download/
           retention-days: 7
-
-      - name: Publish Test Results
-        uses: dorny/test-reporter@v1
-        if: success() || failure()
-        with:
-          name: Test Results (${{ matrix.browser }}) - Work Item ${{ github.event.inputs.work_item_id }}
-          path: TestScriptGeneratorBOT/reports/junit_${{ matrix.browser }}_workitem_${{ github.event.inputs.work_item_id }}.xml
-          reporter: java-junit
-
-      - name: Comment on success
-        if: success()
-        run: |
-          echo "✅ Tests passed for Work Item ${{ github.event.inputs.work_item_id }}"
-          echo "📊 Test Markers: ${{ github.event.inputs.markers }}"
-          echo "🎯 Customer: ${{ github.event.inputs.customer }}"
-          echo "🌐 Browser: ${{ matrix.browser }}"
-
-      - name: Comment on failure
-        if: failure()
-        run: |
-          echo "❌ Tests failed for Work Item ${{ github.event.inputs.work_item_id }}"
-          echo "📊 Test Markers: ${{ github.event.inputs.markers }}"
-          echo "🎯 Customer: ${{ github.event.inputs.customer }}"
-          echo "🌐 Browser: ${{ matrix.browser }}"
-          echo "🔍 Check artifacts for failure details"
