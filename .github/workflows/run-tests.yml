@@ -3,8 +3,8 @@ name: Trigger Tests from Azure DevOps Card
 on:
   workflow_dispatch:
     inputs:
-      work_item_id:
-        description: 'Azure DevOps card number (work item ID)'
+      test_case_ids:
+        description: 'Comma-separated test case IDs from Azure DevOps card'
         required: true
 
 jobs:
@@ -23,9 +23,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Run tests for ADO card
+      - name: Run selected tests
         env:
-          WORK_ITEM_ID: ${{ github.event.inputs.work_item_id }}
+          TEST_CASE_IDS: ${{ github.event.inputs.test_case_ids }}
         run: |
-          echo "Running tests for work item $WORK_ITEM_ID"
-          pytest -v --work-item-id "$WORK_ITEM_ID"
+          echo "Running tests for test case IDs: $TEST_CASE_IDS"
+          pytest -v --testcase-ids "$TEST_CASE_IDS"
