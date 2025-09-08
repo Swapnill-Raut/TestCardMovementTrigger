@@ -58,7 +58,7 @@ jobs:
         run: |
           playwright install chromium
 
-      - name: Run tests from branch
+      - name: Run Reuters Imagen framework tests from branch
         working-directory: TestScriptGeneratorBOT
         env:
           USERNAME: ${{ secrets.USERNAME }}
@@ -68,10 +68,10 @@ jobs:
           AZURE_AUTOMATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_AUTOMATION_STORAGE_CONNECTION_STRING }}
           AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME }}
         run: |
-          echo "🚀 Running tests from branch: ${{ github.event.inputs.branch_name }}"
+          echo "🚀 Running Reuters Imagen tests from branch: ${{ github.event.inputs.branch_name }}"
           echo "🎯 Triggered by Work Item: ${{ github.event.inputs.work_item_id }}"
           
-          # Run Reuters Imagen framework tests from the specific branch
+          # Run Reuters Imagen framework tests using pytest with customer configuration
           pytest -v --customer demo -m smoke --browser chrome \
                  --html=reports/report_workitem_${{ github.event.inputs.work_item_id }}.html \
                  --self-contained-html
@@ -87,15 +87,17 @@ jobs:
             TestScriptGeneratorBOT/reports/
             TestScriptGeneratorBOT/screenshots/
             TestScriptGeneratorBOT/recordings/
+            TestScriptGeneratorBOT/download/
           retention-days: 7
 
       - name: Test execution summary
         if: always()
         run: |
-          echo "📊 Test Execution Summary:"
+          echo "📊 Reuters Imagen Test Execution Summary:"
           echo "Work Item: ${{ github.event.inputs.work_item_id }} - ${{ github.event.inputs.work_item_title }}"
           echo "Branch: ${{ github.event.inputs.branch_name }}"
           echo "Status: ${{ job.status }}"
-          echo "Reuters Imagen Framework: demo customer configuration"
+          echo "Customer Configuration: demo"
           echo "Test Markers: smoke tests executed"
           echo "Browser: chrome"
+          echo "Framework: Reuters Imagen Testing Framework"
