@@ -33,6 +33,11 @@ jobs:
           echo "Branch: ${{ github.event.inputs.branch_name }}"
           echo "Triggered by Azure DevOps card movement to Testing"
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Check for executable code
         id: check_code
         run: |
@@ -74,8 +79,13 @@ jobs:
             echo "Running main.py..."
             python main.py
           elif find . -name "test_*.py" -type f | head -1 | grep -q .; then
-            echo "Running pytest tests..."
-            python -m pytest -v
+            echo "Running pytest tests following Reuters Imagen framework..."
+            # Run pytest with customer configuration if available
+            if [ -f "config/demo.json" ]; then
+              python -m pytest -v --customer demo -m smoke
+            else
+              python -m pytest -v
+            fi
           else
             echo "No main.py or test files found - code exists but no clear entry point"
           fi
