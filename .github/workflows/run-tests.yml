@@ -28,15 +28,24 @@ jobs:
 
       - name: Display trigger information
         run: |
-          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
-          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
-          echo "Branch: ${{ github.event.inputs.branch_name }}"
-          echo "Triggered by: Azure DevOps card movement to Testing"
+          echo "🎯 Work Item ID: ${{ github.event.inputs.work_item_id }}"
+          echo "📝 Work Item Title: ${{ github.event.inputs.work_item_title }}"
+          echo "🌿 Branch: ${{ github.event.inputs.branch_name }}"
+          echo "🚀 Triggered by: Azure DevOps card movement to Testing"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+
+      - name: Create required directories
+        working-directory: TestScriptGeneratorBOT
+        run: |
+          mkdir -p screenshots
+          mkdir -p reports
+          mkdir -p recordings
+          mkdir -p download
 
       - name: Install dependencies
         working-directory: TestScriptGeneratorBOT
@@ -59,20 +68,34 @@ jobs:
           AZURE_AUTOMATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_AUTOMATION_STORAGE_CONNECTION_STRING }}
           AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME }}
         run: |
-          echo "Running tests from branch: ${{ github.event.inputs.branch_name }}"
-          echo "Triggered by Work Item: ${{ github.event.inputs.work_item_id }}"
+          echo "🚀 Running tests from branch: ${{ github.event.inputs.branch_name }}"
+          echo "🎯 Triggered by Work Item: ${{ github.event.inputs.work_item_id }}"
           
-          # Run smoke tests from the branch using Reuters Imagen framework
-          pytest -v --customer demo -m smoke --browser chrome
+          # Run Reuters Imagen framework tests from the specific branch
+          pytest -v --customer demo -m smoke --browser chrome \
+                 --html=reports/report_workitem_${{ github.event.inputs.work_item_id }}.html \
+                 --self-contained-html
           
-          echo "Test execution completed for Work Item ${{ github.event.inputs.work_item_id }}"
+          echo "✅ Test execution completed for Work Item ${{ github.event.inputs.work_item_id }}"
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-workitem-${{ github.event.inputs.work_item_id }}
+          name: test-results-workitem-${{ github.event.inputs.work_item_id }}-branch-${{ github.event.inputs.branch_name }}
           path: |
             TestScriptGeneratorBOT/reports/
             TestScriptGeneratorBOT/screenshots/
+            TestScriptGeneratorBOT/recordings/
           retention-days: 7
+
+      - name: Test execution summary
+        if: always()
+        run: |
+          echo "📊 Test Execution Summary:"
+          echo "Work Item: ${{ github.event.inputs.work_item_id }} - ${{ github.event.inputs.work_item_title }}"
+          echo "Branch: ${{ github.event.inputs.branch_name }}"
+          echo "Status: ${{ job.status }}"
+          echo "Reuters Imagen Framework: demo customer configuration"
+          echo "Test Markers: smoke tests executed"
+          echo "Browser: chrome"
