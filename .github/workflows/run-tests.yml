@@ -1,12 +1,23 @@
-name: Run Tests from Azure DevOps Card
+name: 'Run Tests from Azure DevOps Card'
 
 on:
   workflow_dispatch:
     inputs:
-      test_case_ids:
-        description: 'Comma-separated test case IDs from Azure DevOps card'
+      markers:
+        description: 'Pytest markers to run (e.g., smoke, regression)'
         required: true
         type: string
+        default: 'smoke'
+      customer:
+        description: 'Customer configuration to use'
+        required: false
+        type: string
+        default: 'demo'
+      browsers:
+        description: 'Browsers to test (chrome, edge, firefox, webkit)'
+        required: false
+        type: string
+        default: 'chrome'
       work_item_id:
         description: 'Azure DevOps work item ID'
         required: false
@@ -15,18 +26,23 @@ on:
         description: 'Azure DevOps work item title'
         required: false
         type: string
-      customer:
-        description: 'Customer configuration to use'
+      system_url:
+        description: 'System URL to test (optional override)'
         required: false
-        default: 'demo'
         type: string
 
 jobs:
   run-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: ${{ fromJson(format('["{0}"]', github.event.inputs.browsers || 'chrome')) }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,19 +62,20 @@ jobs:
       - name: Install Playwright browsers
         working-directory: TestScriptGeneratorBOT
         run: |
-          playwright install chromium
+          playwright install ${{ matrix.browser }}
 
-      - name: Create necessary directories
-        working-directory: TestScriptGeneratorBOT
+      - name: Display Test Information
         run: |
-          mkdir -p screenshots reports recordings download
+          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
+          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
+          echo "Test Markers: ${{ github.event.inputs.markers }}"
+          echo "Customer: ${{ github.event.inputs.customer }}"
+          echo "Browser: ${{ matrix.browser }}"
+          echo "System URL: ${{ github.event.inputs.system_url }}"
 
-      - name: Run tests based on MCP discovered test cases
+      - name: Run automated tests
         working-directory: TestScriptGeneratorBOT
         env:
-          TEST_CASE_IDS: ${{ github.event.inputs.test_case_ids }}
-          WORK_ITEM_ID: ${{ github.event.inputs.work_item_id }}
-          CUSTOMER: ${{ github.event.inputs.customer }}
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
           AZURE_CONCATENATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_CONCATENATION_STORAGE_CONNECTION_STRING }}
@@ -66,71 +83,34 @@ jobs:
           AZURE_AUTOMATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_AUTOMATION_STORAGE_CONNECTION_STRING }}
           AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME }}
         run: |
-          echo "=== MCP Triggered Test Execution ==="
-          echo "Work Item ID: $WORK_ITEM_ID"
-          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
-          echo "Test Case IDs: $TEST_CASE_IDS"
-          echo "Customer: $CUSTOMER"
-          echo "=================================="
-          
-          # Map MCP discovered test case IDs to pytest execution
-          if [[ "$TEST_CASE_IDS" == *"image_upload_test"* ]]; then
-            echo "Running image upload tests..."
-            pytest -v --customer $CUSTOMER -m "smoke or image_upload" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"video_upload_test"* ]]; then
-            echo "Running video upload tests..."
-            pytest -v --customer $CUSTOMER -m "smoke or video_upload" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"search_test"* ]]; then
-            echo "Running search tests..."
-            pytest -v --customer $CUSTOMER -m "smoke or search" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"collection_test"* ]]; then
-            echo "Running collection tests..."
-            pytest -v --customer $CUSTOMER -m "smoke or collection" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"download_test"* ]]; then
-            echo "Running download tests..."
-            pytest -v --customer $CUSTOMER -m "smoke or download" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"smoke_test"* || "$TEST_CASE_IDS" == *"basic_workflow_test"* ]]; then
-            echo "Running smoke tests..."
-            pytest -v --customer $CUSTOMER -m "smoke" || true
-          fi
-          
-          if [[ "$TEST_CASE_IDS" == *"concatenation_test"* ]]; then
-            echo "Running concatenation tests..."
-            pytest -v --customer $CUSTOMER -m "concatenation" || true
-          fi
-          
-          # If no specific tests matched, run smoke tests as default
-          if [[ ! "$TEST_CASE_IDS" =~ (image_upload_test|video_upload_test|search_test|collection_test|download_test|smoke_test|basic_workflow_test|concatenation_test) ]]; then
-            echo "No specific test mapping found, running default smoke tests..."
-            pytest -v --customer $CUSTOMER -m "smoke" || true
-          fi
+          # Run tests based on markers provided by MCP monitor
+          pytest -v --customer "${{ github.event.inputs.customer }}" \
+                 -m "${{ github.event.inputs.markers }}" \
+                 --browser "${{ matrix.browser }}" \
+                 --html=reports/report_${{ matrix.browser }}_${{ github.event.inputs.work_item_id }}.html \
+                 --self-contained-html
 
-      - name: Upload test artifacts
+      - name: Upload test reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mcp-test-results-${{ github.event.inputs.work_item_id }}-${{ github.run_number }}
-          path: |
-            TestScriptGeneratorBOT/screenshots/
-            TestScriptGeneratorBOT/reports/
-            TestScriptGeneratorBOT/recordings/
+          name: test-reports-${{ matrix.browser }}-workitem-${{ github.event.inputs.work_item_id }}
+          path: TestScriptGeneratorBOT/reports/
           retention-days: 30
 
-      - name: Test execution summary
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-screenshots-${{ matrix.browser }}-workitem-${{ github.event.inputs.work_item_id }}
+          path: TestScriptGeneratorBOT/screenshots/
+          retention-days: 7
+
+      - name: Comment on Azure DevOps Work Item
         if: always()
         run: |
-          echo "=== MCP Test Execution Summary ==="
-          echo "Work Item: ${{ github.event.inputs.work_item_id }}"
-          echo "Test Cases: ${{ github.event.inputs.test_case_ids }}"
+          echo "Test execution completed for Work Item ${{ github.event.inputs.work_item_id }}"
+          echo "Test Results: ${{ job.status }}"
+          echo "Markers: ${{ github.event.inputs.markers }}"
           echo "Customer: ${{ github.event.inputs.customer }}"
-          echo "Workflow completed at: $(date)"
+          echo "Browser: ${{ matrix.browser }}"
