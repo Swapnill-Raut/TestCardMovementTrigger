@@ -35,11 +35,10 @@ jobs:
       - name: Execute code if available
         if: steps.check_code.outputs.has_code == 'true'
         run: |
-          if [ -f "TestScriptGeneratorBOT/requirements.txt" ]; then
-            pip install -r TestScriptGeneratorBOT/requirements.txt
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
           fi
           
-          cd TestScriptGeneratorBOT
           
           if [ -f "main.py" ]; then
             python main.py
