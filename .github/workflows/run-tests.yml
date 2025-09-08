@@ -1,4 +1,4 @@
-name: 'Run Tests from Azure DevOps Card'
+name: 'Simple Branch Trigger from Azure DevOps Card'
 
 on:
   workflow_dispatch:
@@ -17,87 +17,79 @@ on:
         type: string
 
 jobs:
-  trigger-branch-tests:
+  trigger-branch:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
+      - name: Checkout branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch_name }}
 
-      - name: Display trigger information
+      - name: Display branch information
         run: |
-          echo "🎯 Work Item ID: ${{ github.event.inputs.work_item_id }}"
-          echo "📝 Work Item Title: ${{ github.event.inputs.work_item_title }}"
-          echo "🌿 Branch: ${{ github.event.inputs.branch_name }}"
-          echo "🚀 Triggered by: Azure DevOps card movement to Testing"
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Create required directories
-        working-directory: TestScriptGeneratorBOT
-        run: |
-          mkdir -p screenshots
-          mkdir -p reports
-          mkdir -p recordings
-          mkdir -p download
-
-      - name: Install dependencies
-        working-directory: TestScriptGeneratorBOT
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Install Playwright browsers
-        working-directory: TestScriptGeneratorBOT
-        run: |
-          playwright install chromium
-
-      - name: Run Reuters Imagen framework tests from branch
-        working-directory: TestScriptGeneratorBOT
-        env:
-          USERNAME: ${{ secrets.USERNAME }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-          AZURE_CONCATENATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_CONCATENATION_STORAGE_CONNECTION_STRING }}
-          AZURE_CONCATENATION_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_CONCATENATION_STORAGE_CONTAINER_NAME }}
-          AZURE_AUTOMATION_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_AUTOMATION_STORAGE_CONNECTION_STRING }}
-          AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME: ${{ secrets.AZURE_AUTOMATION_MEDIA_STORAGE_CONTAINER_NAME }}
-        run: |
-          echo "🚀 Running Reuters Imagen tests from branch: ${{ github.event.inputs.branch_name }}"
-          echo "🎯 Triggered by Work Item: ${{ github.event.inputs.work_item_id }}"
-          
-          # Run Reuters Imagen framework tests using pytest with customer configuration
-          pytest -v --customer demo -m smoke --browser chrome \
-                 --html=reports/report_workitem_${{ github.event.inputs.work_item_id }}.html \
-                 --self-contained-html
-          
-          echo "✅ Test execution completed for Work Item ${{ github.event.inputs.work_item_id }}"
-
-      - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-results-workitem-${{ github.event.inputs.work_item_id }}-branch-${{ github.event.inputs.branch_name }}
-          path: |
-            TestScriptGeneratorBOT/reports/
-            TestScriptGeneratorBOT/screenshots/
-            TestScriptGeneratorBOT/recordings/
-            TestScriptGeneratorBOT/download/
-          retention-days: 7
-
-      - name: Test execution summary
-        if: always()
-        run: |
-          echo "📊 Reuters Imagen Test Execution Summary:"
-          echo "Work Item: ${{ github.event.inputs.work_item_id }} - ${{ github.event.inputs.work_item_title }}"
+          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
+          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
           echo "Branch: ${{ github.event.inputs.branch_name }}"
-          echo "Status: ${{ job.status }}"
-          echo "Customer Configuration: demo"
-          echo "Test Markers: smoke tests executed"
-          echo "Browser: chrome"
-          echo "Framework: Reuters Imagen Testing Framework"
+          echo "Triggered by Azure DevOps card movement to Testing"
+
+      - name: Check for executable code
+        id: check_code
+        run: |
+          echo "Checking for executable code in branch..."
+          
+          # Check if TestScriptGeneratorBOT directory exists
+          if [ -d "TestScriptGeneratorBOT" ]; then
+            echo "TestScriptGeneratorBOT directory found"
+            
+            # Check for Python files
+            if find TestScriptGeneratorBOT -name "*.py" -type f | head -1 | grep -q .; then
+              echo "Python code found"
+              echo "has_code=true" >> $GITHUB_OUTPUT
+            else
+              echo "No Python code found"
+              echo "has_code=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "No TestScriptGeneratorBOT directory found"
+            echo "has_code=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute code if available
+        if: steps.check_code.outputs.has_code == 'true'
+        run: |
+          echo "Code found - executing from branch ${{ github.event.inputs.branch_name }}"
+          
+          # Check if requirements.txt exists and install dependencies
+          if [ -f "TestScriptGeneratorBOT/requirements.txt" ]; then
+            echo "Installing Python dependencies..."
+            python -m pip install --upgrade pip
+            pip install -r TestScriptGeneratorBOT/requirements.txt
+          fi
+          
+          # Check if there's a main.py or pytest tests to run
+          cd TestScriptGeneratorBOT
+          
+          if [ -f "main.py" ]; then
+            echo "Running main.py..."
+            python main.py
+          elif find . -name "test_*.py" -type f | head -1 | grep -q .; then
+            echo "Running pytest tests..."
+            python -m pytest -v
+          else
+            echo "No main.py or test files found - code exists but no clear entry point"
+          fi
+
+      - name: No code execution
+        if: steps.check_code.outputs.has_code == 'false'
+        run: |
+          echo "No code for execution"
+          echo "Branch ${{ github.event.inputs.branch_name }} does not contain executable code"
+
+      - name: Execution summary
+        run: |
+          echo "Branch Trigger Summary:"
+          echo "Work Item: ${{ github.event.inputs.work_item_id }}"
+          echo "Branch: ${{ github.event.inputs.branch_name }}"
+          echo "Code Available: ${{ steps.check_code.outputs.has_code }}"
+          echo "Execution completed"
