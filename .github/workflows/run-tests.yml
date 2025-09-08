@@ -3,14 +3,6 @@ name: 'Simple Branch Trigger from Azure DevOps Card'
 on:
   workflow_dispatch:
     inputs:
-      work_item_id:
-        description: 'Azure DevOps work item ID'
-        required: true
-        type: string
-      work_item_title:
-        description: 'Azure DevOps work item title'
-        required: false
-        type: string
       branch_name:
         description: 'Branch associated with the work item'
         required: true
@@ -26,13 +18,6 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch_name }}
 
-      - name: Display branch information
-        run: |
-          echo "Work Item ID: ${{ github.event.inputs.work_item_id }}"
-          echo "Work Item Title: ${{ github.event.inputs.work_item_title }}"
-          echo "Branch: ${{ github.event.inputs.branch_name }}"
-          echo "Triggered by Azure DevOps card movement to Testing"
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -41,65 +26,28 @@ jobs:
       - name: Check for executable code
         id: check_code
         run: |
-          echo "Checking for executable code in branch..."
-          
-          # Check if TestScriptGeneratorBOT directory exists
-          if [ -d "TestScriptGeneratorBOT" ]; then
-            echo "TestScriptGeneratorBOT directory found"
-            
-            # Check for Python files
-            if find TestScriptGeneratorBOT -name "*.py" -type f | head -1 | grep -q .; then
-              echo "Python code found"
-              echo "has_code=true" >> $GITHUB_OUTPUT
-            else
-              echo "No Python code found"
-              echo "has_code=false" >> $GITHUB_OUTPUT
-            fi
+          if [ -d "TestScriptGeneratorBOT" ] && find TestScriptGeneratorBOT -name "*.py" -type f | head -1 | grep -q .; then
+            echo "has_code=true" >> $GITHUB_OUTPUT
           else
-            echo "No TestScriptGeneratorBOT directory found"
             echo "has_code=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Execute code if available
         if: steps.check_code.outputs.has_code == 'true'
         run: |
-          echo "Code found - executing from branch ${{ github.event.inputs.branch_name }}"
-          
-          # Check if requirements.txt exists and install dependencies
           if [ -f "TestScriptGeneratorBOT/requirements.txt" ]; then
-            echo "Installing Python dependencies..."
-            python -m pip install --upgrade pip
             pip install -r TestScriptGeneratorBOT/requirements.txt
           fi
           
-          # Check if there's a main.py or pytest tests to run
           cd TestScriptGeneratorBOT
           
           if [ -f "main.py" ]; then
-            echo "Running main.py..."
             python main.py
           elif find . -name "test_*.py" -type f | head -1 | grep -q .; then
-            echo "Running pytest tests following Reuters Imagen framework..."
-            # Run pytest with customer configuration if available
-            if [ -f "config/demo.json" ]; then
-              python -m pytest -v --customer demo -m smoke
-            else
-              python -m pytest -v
-            fi
-          else
-            echo "No main.py or test files found - code exists but no clear entry point"
+            python -m pytest -v
           fi
 
       - name: No code execution
         if: steps.check_code.outputs.has_code == 'false'
         run: |
           echo "No code for execution"
-          echo "Branch ${{ github.event.inputs.branch_name }} does not contain executable code"
-
-      - name: Execution summary
-        run: |
-          echo "Branch Trigger Summary:"
-          echo "Work Item: ${{ github.event.inputs.work_item_id }}"
-          echo "Branch: ${{ github.event.inputs.branch_name }}"
-          echo "Code Available: ${{ steps.check_code.outputs.has_code }}"
-          echo "Execution completed"
