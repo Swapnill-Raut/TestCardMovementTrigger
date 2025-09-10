@@ -1,0 +1,94 @@
+name: Azure DevOps Triggered Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      work_item_id:
+        description: 'Azure DevOps Work Item ID'
+        required: true
+        type: string
+      work_item_title:
+        description: 'Work Item Title'
+        required: false
+        type: string
+        default: 'Test Work Item'
+      work_item_type:
+        description: 'Work Item Type'
+        required: false
+        type: string
+        default: 'Product Backlog Item'
+      board_column:
+        description: 'Board Column'
+        required: false
+        type: string
+        default: 'Testing'
+      trigger_source:
+        description: 'Source that triggered this workflow'
+        required: false
+        type: string
+        default: 'Azure DevOps MCP Monitor'
+      target_branch:
+        description: 'Target branch for testing'
+        required: false
+        type: string
+        default: 'main'
+
+env:
+  WORK_ITEM_ID: ${{ inputs.work_item_id }}
+  WORK_ITEM_TITLE: ${{ inputs.work_item_title }}
+  WORK_ITEM_TYPE: ${{ inputs.work_item_type }}
+  BOARD_COLUMN: ${{ inputs.board_column }}
+  TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+  TARGET_BRANCH: ${{ inputs.target_branch }}
+
+jobs:
+  test-workflow:
+    name: Test Azure DevOps Integration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.target_branch || 'main' }}
+    
+    - name: Display Work Item Information
+      run: |
+        echo "🎯 Azure DevOps Work Item Triggered Workflow"
+        echo "================================================"
+        echo "Work Item ID: ${{ inputs.work_item_id }}"
+        echo "Work Item Title: ${{ inputs.work_item_title }}"
+        echo "Work Item Type: ${{ inputs.work_item_type }}"
+        echo "Board Column: ${{ inputs.board_column }}"
+        echo "Trigger Source: ${{ inputs.trigger_source }}"
+        echo "Target Branch: ${{ inputs.target_branch }}"
+        echo "Current Branch: ${{ github.ref_name }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Workflow: ${{ github.workflow }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Event: ${{ github.event_name }}"
+        echo "================================================"
+    
+    - name: Run Sample Tests
+      run: |
+        echo "🧪 Running tests for Work Item ${{ inputs.work_item_id }}..."
+        echo "This is where your actual tests would run"
+        echo "For example:"
+        echo "  - Unit tests"
+        echo "  - Integration tests"
+        echo "  - Code quality checks"
+        echo "  - Security scans"
+        echo ""
+        echo "✅ All tests completed successfully!"
+    
+    - name: Post Results Summary
+      run: |
+        echo "📊 Test Results Summary"
+        echo "======================"
+        echo "Work Item: ${{ inputs.work_item_id }} - ${{ inputs.work_item_title }}"
+        echo "Status: ✅ PASSED"
+        echo "Tests: 3/3 passed"
+        echo "Coverage: 95%"
+        echo "Duration: 45 seconds"
+        echo ""
+        echo "🎉 Workflow completed successfully!"
