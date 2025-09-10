@@ -1,0 +1,28 @@
+# Python dependencies for Azure DevOps MCP Monitor (Production)
+
+# MCP framework
+mcp==1.0.0
+
+# Azure DevOps client
+azure-devops>=7.1.0b3
+msrest>=0.7.1
+
+# GitHub API client
+PyGithub>=1.59.0
+
+# HTTP clients
+aiohttp>=3.8.0
+
+# Configuration and environment management
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.1.0
+
+# Logging
+structlog>=23.0.0
+
+# Scheduling
+APScheduler>=3.10.0
+
+# CLI Tools
+click>=8.1.0
