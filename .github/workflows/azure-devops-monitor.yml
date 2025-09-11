@@ -2,8 +2,8 @@ name: Azure DevOps Work Item Monitor
 
 on:
   schedule:
-    # Run every 5 minutes (adjust as needed)
-    - cron: '*/5 * * * *'
+    # Run every 30 minutes (adjust as needed)
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       run_once:
@@ -63,3 +63,4 @@ jobs:
           monitor.log
           processed_items.json
         retention-days: 7
+
