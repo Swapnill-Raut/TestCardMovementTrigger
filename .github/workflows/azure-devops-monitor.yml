@@ -69,8 +69,8 @@ jobs:
           echo "Validating production monitor..."
           
           # Check both possible directory structures
-          if [ -f "Customer_QA/AI_Adoption_POC/azure_devops_monitor.py" ]; then
-            MONITOR_PATH="Customer_QA/AI_Adoption_POC"
+          if [ -f "monitor.py" ]; then
+            MONITOR_PATH=""
           elif [ -f "CustomerQA/AI_Adoption_POC/azure_devops_monitor.py" ]; then
             MONITOR_PATH="CustomerQA/AI_Adoption_POC"
           else
@@ -145,3 +145,4 @@ jobs:
           echo "- ✅ State persistence across runs" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Team-specific work item filtering" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Enhanced error handling and comprehensive logging" >> $GITHUB_STEP_SUMMARY
+
